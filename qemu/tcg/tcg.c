@@ -671,11 +671,6 @@ static void process_op_defs(TCGContext *s);
 static TCGTemp *tcg_global_reg_new_internal(TCGContext *s, TCGType type,
                                             TCGReg reg, const char *name);
 
-uint64_t inline_hook_wrap(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7, uint32_t arg8, uint32_t arg9, uint32_t arg10, uint32_t arg11, uint32_t arg12) {
-
-    return 0;
-}
-
 void uc_add_inline_hook(uc_engine *uc, struct hook *hk, void** args, int args_len)
 {
     TCGHelperInfo* info = g_malloc(sizeof(TCGHelperInfo));
