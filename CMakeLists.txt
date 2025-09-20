@@ -48,6 +48,9 @@ if(APPLE)
     endif()
 endif()
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -g")
+
 # Detect if unicorn is compiled as the top-level project
 set(PROJECT_IS_TOP_LEVEL OFF)
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -80,13 +83,13 @@ include(cmake/bundle_static.cmake)
 #
 # Also we would like users to link a native cmake target, instead of a custom target for better
 # compatability.
-option(BUILD_SHARED_LIBS "Build shared instead of static library" ${PROJECT_IS_TOP_LEVEL})
+option(BUILD_SHARED_LIBS "Build shared instead of static library" OFF)
 option(UNICORN_LEGACY_STATIC_ARCHIVE "Enable Unicorn v1 style all-in-one objects archive for libunicorn.a" ${PROJECT_IS_TOP_LEVEL})
 option(UNICORN_FUZZ "Enable fuzzing" OFF)
 option(UNICORN_LOGGING "Enable logging" OFF)
 option(UNICORN_BUILD_TESTS "Build unicorn tests" ${PROJECT_IS_TOP_LEVEL})
 option(UNICORN_INSTALL "Enable unicorn installation" ${PROJECT_IS_TOP_LEVEL})
-set(UNICORN_ARCH "x86;arm;aarch64;riscv;mips;sparc;m68k;ppc;s390x;tricore" CACHE STRING "Enabled unicorn architectures")
+set(UNICORN_ARCH "x86" CACHE STRING "Enabled unicorn architectures")
 option(UNICORN_TRACER "Trace unicorn execution" OFF)
 
 foreach(ARCH_LOOP ${UNICORN_ARCH})
@@ -203,7 +206,11 @@ else()
             OUTPUT_VARIABLE UC_COMPILER_MACRO)
 
         while(TRUE)
-            string(FIND "${UC_COMPILER_MACRO}" "__x86_64__" UC_RET)
+            set(UNICORN_TARGET_ARCH "i386")
+set(UNICORN_CFLAGS -m32)
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m32")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m32")
+break()
             if(${UC_RET} GREATER_EQUAL "0")
                 set(UNICORN_TARGET_ARCH "i386")
                 string(FIND "${UC_COMPILER_MACRO}" "__ILP32__" UC_RET)
@@ -470,7 +477,7 @@ else()
     endif()
     add_compile_options(
         ${UNICORN_CFLAGS}
-        -I${CMAKE_CURRENT_SOURCE_DIR}/qemu/tcg/${UNICORN_TARGET_ARCH}
+        -I${CMAKE_CURRENT_SOURCE_DIR}/qemu/tcg/tci
         -D_GNU_SOURCE
         -D_FILE_OFFSET_BITS=64
         -D_LARGEFILE_SOURCE
@@ -506,6 +513,7 @@ set(UNICORN_ARCH_COMMON
     qemu/tcg/tcg-op.c
     qemu/tcg/tcg-op-gvec.c
     qemu/tcg/tcg-op-vec.c
+	qemu/tcg/tci.c
 
     qemu/accel/tcg/cpu-exec.c
     qemu/accel/tcg/cpu-exec-common.c

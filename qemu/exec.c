@@ -1119,8 +1119,10 @@ RAMBlock *qemu_ram_alloc_from_ptr(struct uc_struct *uc, ram_addr_t size, void *h
     }
 
     new_block = g_malloc0(sizeof(*new_block));
-    if (new_block == NULL)
+    if (new_block == NULL) {
         return NULL;
+    }
+        
     new_block->mr = mr;
     new_block->used_length = size;
     new_block->max_length = max_size;

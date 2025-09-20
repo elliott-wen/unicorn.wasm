@@ -1401,6 +1401,7 @@ uc_err uc_mem_map(uc_engine *uc, uint64_t address, uint64_t size,
     }
 
     res = mem_map(uc, uc->memory_map(uc, address, size, perms));
+
     restore_jit_state(uc);
     return res;
 }

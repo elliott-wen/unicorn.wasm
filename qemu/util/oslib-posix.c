@@ -234,6 +234,10 @@ static void *qemu_ram_mmap(struct uc_struct *uc,
 
     offset = QEMU_ALIGN_UP((uintptr_t)guardptr, align) - (uintptr_t)guardptr;
 
+#if defined(__EMSCRIPTEN__)
+    return guardptr + offset;
+#endif
+
     ptr = mmap(guardptr + offset, size, PROT_READ | PROT_WRITE,
                flags | map_sync_flags, -1, 0);
 

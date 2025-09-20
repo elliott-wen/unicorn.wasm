@@ -12,6 +12,7 @@
 *.jar
 *.gem
 *~
+*.p.bak
 
 qemu/*-softmmu/
 

@@ -4,6 +4,8 @@
 #ifndef UNICORN_ARCH_POSTFIX
 #define UNICORN_ARCH_POSTFIX _tricore
 #endif
+#define tci_tb_ptr tci_tb_ptr_tricore
+#define tcg_qemu_tb_exec tcg_qemu_tb_exec_tricore
 #define gen_helper_check_exit_request gen_helper_check_exit_request_tricore
 #define unicorn_fill_tlb unicorn_fill_tlb_tricore
 #define reg_read reg_read_tricore

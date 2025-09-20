@@ -28,6 +28,7 @@
 #include "exec/helper-proto.h"
 #include "exec/helper-gen.h"
 #include "qemu/compiler.h"
+#include "wrapper_x86_64.inc.c"
 
 #include "unicorn/platform.h"
 #include "uc_priv.h"

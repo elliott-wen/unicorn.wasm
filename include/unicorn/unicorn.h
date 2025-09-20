@@ -444,7 +444,7 @@ typedef enum uc_hook_type {
   @value: value of data being written to memory, or irrelevant if type = READ.
   @user_data: user data passed to tracing APIs
 */
-typedef void (*uc_cb_hookmem_t)(uc_engine *uc, uc_mem_type type,
+typedef bool (*uc_cb_hookmem_t)(uc_engine *uc, uc_mem_type type,
                                 uint64_t address, int size, int64_t value,
                                 void *user_data);
 

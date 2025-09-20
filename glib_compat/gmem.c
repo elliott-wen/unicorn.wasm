@@ -131,6 +131,7 @@ gpointer g_malloc_n (gsize n_blocks, gsize n_block_bytes)
  * 
  * Returns: a pointer to the allocated memory
  */
+#include <stdio.h>
 gpointer g_malloc0 (gsize n_bytes)
 {
     if (n_bytes) {
@@ -140,8 +141,6 @@ gpointer g_malloc0 (gsize n_bytes)
         if (mem)
             return mem;
 
-        //g_error ("%s: failed to allocate %"G_GSIZE_FORMAT" bytes",
-        //         G_STRLOC, n_bytes);
     }
 
     return NULL;

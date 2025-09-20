@@ -390,6 +390,7 @@ TranslationBlock *tb_htable_lookup(CPUState *cpu, target_ulong pc,
 void tb_set_jmp_target(TranslationBlock *tb, int n, uintptr_t addr);
 void tb_exec_lock(struct uc_struct*);
 void tb_exec_unlock(struct uc_struct*);
+extern uintptr_t tci_tb_ptr;
 
 /* GETPC is the true target of the return instruction that we'll execute.  */
 #ifdef _MSC_VER
@@ -397,7 +398,7 @@ void tb_exec_unlock(struct uc_struct*);
 # define GETPC() (uintptr_t)_ReturnAddress()
 #else
 # define GETPC() \
-    ((uintptr_t)__builtin_extract_return_addr(__builtin_return_address(0)))
+    tci_tb_ptr
 #endif
 
 /* The true return address will often point to a host insn that is part of

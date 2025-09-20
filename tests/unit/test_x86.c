@@ -110,8 +110,8 @@ typedef struct _INSN_IN_RESULT {
     int size;
 } INSN_IN_RESULT;
 
-static void test_x86_in_callback(uc_engine *uc, uint32_t port, int size,
-                                 void *user_data)
+static uint32_t test_x86_in_callback(uc_engine *uc, uint32_t port, int size,
+                                     void *user_data)
 {
     INSN_IN_RESULT *result = (INSN_IN_RESULT *)user_data;
     uint32_t eip;
@@ -119,8 +119,9 @@ static void test_x86_in_callback(uc_engine *uc, uint32_t port, int size,
     result->port = port;
     result->size = size;
 
-    OK(uc_reg_read(uc, UC_X86_REG_EIP, (void*)&eip));
+    OK(uc_reg_read(uc, UC_X86_REG_EIP, (void *)&eip));
     TEST_CHECK(eip == code_start);
+    return 0;
 }
 
 static void test_x86_in(void)
@@ -210,7 +211,6 @@ static bool test_x86_mem_hook_all_callback(uc_engine *uc, uc_mem_type type,
     if (type == UC_MEM_READ_UNMAPPED) {
         uc_mem_map(uc, address, 0x1000, UC_PROT_ALL);
     }
-
     return true;
 }
 
@@ -775,7 +775,7 @@ static int test_x86_hook_cpuid_callback(uc_engine *uc, void *data)
     uint32_t reg = 7;
     uint32_t eip;
 
-    OK(uc_reg_read(uc, UC_X86_REG_EIP, (void*)&eip));
+    OK(uc_reg_read(uc, UC_X86_REG_EIP, (void *)&eip));
     OK(uc_reg_write(uc, UC_X86_REG_EAX, &reg));
 
     TEST_CHECK(eip == code_start + 1);
@@ -1674,8 +1674,7 @@ static void test_x86_read_virtual(void)
     OK(uc_reg_read(uc, UC_X86_REG_RIP, &rip));
 
     OK(uc_emu_start(uc, rip, 0x0, 0, 0));
-    OK(uc_vmem_read(uc, 0x4000, UC_PROT_READ, &parrent,
-                           sizeof(parrent)));
+    OK(uc_vmem_read(uc, 0x4000, UC_PROT_READ, &parrent, sizeof(parrent)));
 
     /* restore for child */
     OK(uc_context_restore(uc, context));
@@ -1687,9 +1686,8 @@ static void test_x86_read_virtual(void)
 
     OK(uc_emu_start(uc, rip, 0x0, 0, 0));
     OK(uc_vmem_read(uc, 0x4000, UC_PROT_READ, &child, sizeof(child)));
-    uc_assert_err(
-        UC_ERR_READ_PROT,
-        uc_vmem_read(uc, 0x1000, UC_PROT_WRITE, &tmp, sizeof(tmp)));
+    uc_assert_err(UC_ERR_READ_PROT,
+                  uc_vmem_read(uc, 0x1000, UC_PROT_WRITE, &tmp, sizeof(tmp)));
     TEST_CHECK(parrent == 60);
     TEST_CHECK(child == 42);
 }
@@ -2175,7 +2173,7 @@ static bool test_x86_mem_hooks_pc_guarante_mem(uc_engine *uc, uc_mem_type type,
 {
     if (addr >= code_start + code_len) {
         uint32_t eip;
-        OK(uc_reg_read(uc, UC_X86_REG_EIP, (void*)&eip));
+        OK(uc_reg_read(uc, UC_X86_REG_EIP, (void *)&eip));
         TEST_CHECK(eip == code_start + 1);
     }
     return true;
@@ -2184,18 +2182,19 @@ static bool test_x86_mem_hooks_pc_guarante_mem(uc_engine *uc, uc_mem_type type,
 static void test_x86_mem_hooks_pc_guarantee(void)
 {
     uc_engine *uc;
-    // bs, _ = ks.asm("inc edx; t: mov eax, [ebx]; inc ebx; cmp ebx, ecx; jnz t;")
+    // bs, _ = ks.asm("inc edx; t: mov eax, [ebx]; inc ebx; cmp ebx, ecx; jnz
+    // t;")
     char code[] = "\x42\x8b\x03\x43\x39\xcb\x75\xf9";
-    uint32_t ebx=code_start + code_len, ecx = code_start + code_len + 0x10;
+    uint32_t ebx = code_start + code_len, ecx = code_start + code_len + 0x10;
     uc_hook hk;
 
     uc_common_setup(&uc, UC_ARCH_X86, UC_MODE_32, code, sizeof(code) - 1);
 
     OK(uc_mem_map(uc, code_start + code_len, 0x1000, UC_PROT_ALL));
-    OK(uc_hook_add(uc, &hk, UC_HOOK_MEM_READ, test_x86_mem_hooks_pc_guarante_mem, NULL,
-                   1, 0));
-    OK(uc_reg_write(uc, UC_X86_REG_EBX, (void*)&ebx));
-    OK(uc_reg_write(uc, UC_X86_REG_ECX, (void*)&ecx));
+    OK(uc_hook_add(uc, &hk, UC_HOOK_MEM_READ,
+                   test_x86_mem_hooks_pc_guarante_mem, NULL, 1, 0));
+    OK(uc_reg_write(uc, UC_X86_REG_EBX, (void *)&ebx));
+    OK(uc_reg_write(uc, UC_X86_REG_ECX, (void *)&ecx));
     OK(uc_emu_start(uc, code_start, code_start + sizeof(code) - 1, 0, 0));
 
     OK(uc_close(uc));

@@ -53,7 +53,7 @@ print_error() {
 
 error_exit() {
     print_error "$@"
-    exit 1
+    #exit 1
 }
 
 do_compiler() {
@@ -2442,7 +2442,7 @@ if test "$tcg" = "yes"; then
   echo "CONFIG_TCG=y" >> $config_host_mak
 fi
 if test "$madvise" = "yes" ; then
-  echo "CONFIG_MADVISE=y" >> $config_host_mak
+  echo "UNUSED_CONFIG_MADVISE=y" >> $config_host_mak
 fi
 if test "$posix_madvise" = "yes" ; then
   echo "CONFIG_POSIX_MADVISE=y" >> $config_host_mak
@@ -2497,19 +2497,19 @@ if test "$cpuid_h" = "yes" ; then
 fi
 
 if test "$int128" = "yes" ; then
-  echo "CONFIG_INT128=y" >> $config_host_mak
+  echo "UNUSED_CONFIG_INT128=y" >> $config_host_mak
 fi
 
 if test "$atomic128" = "yes" ; then
-  echo "CONFIG_ATOMIC128=y" >> $config_host_mak
+  echo "UNUSED_CONFIG_ATOMIC128=y" >> $config_host_mak
 fi
 
 if test "$cmpxchg128" = "yes" ; then
-  echo "CONFIG_CMPXCHG128=y" >> $config_host_mak
+  echo "UNUSED_CONFIG_CMPXCHG128=y" >> $config_host_mak
 fi
 
 if test "$atomic64" = "yes" ; then
-  echo "CONFIG_ATOMIC64=y" >> $config_host_mak
+  echo "UNUSED_CONFIG_ATOMIC64=y" >> $config_host_mak
 fi
 
 if test "$attralias" = "yes" ; then

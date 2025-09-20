@@ -1103,7 +1103,7 @@ static void acutest_run_(const struct acutest_test_ *test, int index,
     acutest_current_test_ = test;
     acutest_test_already_logged_ = 0;
     acutest_timer_get_time_(&start);
-
+    acutest_no_exec_ = 1;
     if (!acutest_no_exec_) {
 
 #if defined(ACUTEST_UNIX_)
