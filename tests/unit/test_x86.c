@@ -309,7 +309,7 @@ static void test_x86_loop(void)
     OK(uc_reg_write(uc, UC_X86_REG_ECX, &r_ecx));
     OK(uc_reg_write(uc, UC_X86_REG_EDX, &r_edx));
 
-    OK(uc_emu_start(uc, code_start, code_start + sizeof(code) - 1, 1 * 1000000,
+    OK(uc_emu_start(uc, code_start, code_start + sizeof(code) - 1, 1000000,
                     0));
 
     OK(uc_reg_read(uc, UC_X86_REG_ECX, &r_ecx));
@@ -660,7 +660,7 @@ static void test_x86_smc_add(void)
     OK(uc_close(uc));
 }
 
-static void test_x86_smc_mem_hook_callback(uc_engine *uc, uc_mem_type t,
+static bool test_x86_smc_mem_hook_callback(uc_engine *uc, uc_mem_type t,
                                            uint64_t addr, int size,
                                            uint64_t value, void *user_data)
 {
@@ -671,6 +671,7 @@ static void test_x86_smc_mem_hook_callback(uc_engine *uc, uc_mem_type t,
     TEST_CHECK(*i < (sizeof(write_addresses) / sizeof(write_addresses[0])));
     TEST_CHECK(write_addresses[*i] == addr);
     (*i)++;
+    return true;
 }
 
 static void test_x86_smc_mem_hook(void)
@@ -2200,13 +2201,16 @@ static void test_x86_mem_hooks_pc_guarantee(void)
     OK(uc_close(uc));
 }
 
+
 TEST_LIST = {
     {"test_x86_in", test_x86_in},
     {"test_x86_out", test_x86_out},
     {"test_x86_mem_hook_all", test_x86_mem_hook_all},
     {"test_x86_inc_dec_pxor", test_x86_inc_dec_pxor},
     {"test_x86_relative_jump", test_x86_relative_jump},
+#ifndef __EMSCRIPTEN__
     {"test_x86_loop", test_x86_loop},
+#endif
     {"test_x86_invalid_mem_read", test_x86_invalid_mem_read},
     {"test_x86_invalid_mem_write", test_x86_invalid_mem_write},
     {"test_x86_invalid_jump", test_x86_invalid_jump},

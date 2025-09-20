@@ -48,8 +48,8 @@ if(APPLE)
     endif()
 endif()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -g")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -g")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -g -gsource-map -O0")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -g -gsource-map -O0")
 
 # Detect if unicorn is compiled as the top-level project
 set(PROJECT_IS_TOP_LEVEL OFF)

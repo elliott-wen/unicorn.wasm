@@ -47,6 +47,7 @@ static inline void gen_uc_tracecode(TCGContext *tcg_ctx, int32_t size, int32_t t
     };
 
     const int hook_type = type & UC_HOOK_IDX_MASK;
+#ifndef __EMSCRIPTEN__
     if (puc->hooks_count[hook_type] == 1 && !(type & UC_HOOK_FLAG_NO_STOP)) {
         cur = puc->hook[hook_type].head;
         
@@ -61,7 +62,10 @@ static inline void gen_uc_tracecode(TCGContext *tcg_ctx, int32_t size, int32_t t
             cur = cur->next;
         }
 
-    } else {
+    } 
+    else 
+#endif
+    {
         ttype = tcg_const_i32(tcg_ctx, type);
         gen_helper_uc_tracecode(tcg_ctx, tsize, ttype, tuc, tpc);
         tcg_temp_free_i32(tcg_ctx, ttype);
