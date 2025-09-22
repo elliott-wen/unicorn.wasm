@@ -793,9 +793,18 @@ uint64_t wrapper_helper_float_class_s_mips(uint32_t arg1, uint32_t arg2, uint32_
 uint64_t res = (uint64_t)helper_float_class_s_mips((void*)arg1, (uint32_t)arg2); return res;
 }
 
+// uint64_t wrapper_helper_float_class_s_mipsel(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7, uint32_t arg8, uint32_t arg9, uint32_t arg10, uint32_t arg11, uint32_t arg12) {
+// uint64_t res = (uint64_t)helper_float_class_s_mipsel((void*)arg1, (uint32_t)arg2); return res;
+// }
+
+
 uint64_t wrapper_helper_float_class_d_mips(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7, uint32_t arg8, uint32_t arg9, uint32_t arg10, uint32_t arg11, uint32_t arg12) {
 uint64_t res = (uint64_t)helper_float_class_d_mips((void*)arg1, (uint64_t)(0 | (((uint64_t)arg2) << 0) | (((uint64_t)arg3) << 32))); return res;
 }
+
+// uint64_t wrapper_helper_float_class_d_mipsel(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7, uint32_t arg8, uint32_t arg9, uint32_t arg10, uint32_t arg11, uint32_t arg12) {
+// uint64_t res = (uint64_t)helper_float_class_d_mipsel((void*)arg1, (uint64_t)(0 | (((uint64_t)arg2) << 0) | (((uint64_t)arg3) << 32))); return res;
+// }
 
 uint64_t wrapper_helper_float_maddf_s(uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5, uint32_t arg6, uint32_t arg7, uint32_t arg8, uint32_t arg9, uint32_t arg10, uint32_t arg11, uint32_t arg12) {
 uint64_t res = (uint64_t)helper_float_maddf_s((void*)arg1, (uint32_t)arg2, (uint32_t)arg3, (uint32_t)arg4); return res;

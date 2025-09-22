@@ -172,7 +172,7 @@ function createUC(MUnicornInstance) {
                 // Callback wrapping simplified
                 if (type & uc.HOOK_MEM_READ || type & uc.HOOK_MEM_WRITE || type & uc.HOOK_MEM_FETCH || type & uc.HOOK_MEM_READ_AFTER) {
                     const callback = (_, type2, addr_lo, addr_hi, size, val_lo, val_hi, _2) => user_callback(handle, type2, addr_lo, addr_hi, size, val_lo, val_hi, user_data);
-                    callback_ptr = MUnicornInstance.addFunction(callback, 'viiiiiiii');
+                    callback_ptr = MUnicornInstance.addFunction(callback, 'iiiiiiiii');
                 } else {
                     throw 'Unimplemented hook type';
                 }
