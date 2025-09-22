@@ -1,199 +1,4 @@
 /**
- * (c) 2018 Libelf.JS
- * Arbitrary integer emulation
- * Based on https://github.com/pierrec/js-cuint
- */
-
-var ElfUInt = function (width) {
-    // Configure properties based on bit-width
-    var mask = (1 << (((width - 1) % 16) + 1)) - 1;
-    var nchunks = (width + 15) / 16;
-
-    // Return class
-    return function (value) {
-        this.width = width;
-        this.chunks = new Uint16Array(nchunks);
-        this.mask = mask;
-
-        // Initialization:
-        // Several checks are omitted since JavaScript will cast any undefined/NaN's
-        // into the appropriate type while writing to the chunks array.
-        if (value == null) {
-            this.chunks.fill(0);
-        } else {
-            // Initialize from Number
-            if (typeof value === 'number') {
-                if (!Number.isSafeInteger(value)) {
-                    console.warn(
-                        'Libelf.js: number ' + value +
-                        ' is beyond 53 bits integer precision, use other initialization formats for better precision'
-                    );
-                }
-                if (value > Math.pow(2, this.width) - 1 || value < -Math.pow(2, this.width - 1)) {
-                    console.warn(
-                        'Libelf.js: number ' + value +
-                        ' overflows ' + this.width + ' bits width, use larger width to keep higher bits'
-                    );
-                }
-                for (var i = 0; i < this.chunks.length; i++) {
-                    // Apply mask on the last chunk to cast to correct width
-                    this.chunks[i] = value & (i === this.chunks.length - 1 ? this.mask : 0xFFFF);
-                    if (value < 0) {
-                        // Fix round off of bits in negative values
-                        value -= 0xFFFF;
-                    }
-                    value /= 0x10000;
-                }
-            }
-            // Initialize from String
-            if (typeof value === 'string') {
-                if (value.toLowerCase().startsWith("0x"))
-                    value = value.slice(2);
-                for (var i = 0; i < this.chunks.length; i++) {
-                    // Force NaN value to be 0
-                    this.chunks[i] = parseInt(value.slice(-4), 16) | 0;
-                    value = value.slice(0, -4);
-                }
-            }
-            // Initialize from Array (32-bit entries)
-            if (typeof value === 'object' && Array.isArray(value)) {
-                for (var i = 0; i < this.chunks.length; i++) {
-                    if (i % 2 == 0)
-                        this.chunks[i] = (value[(i / 2) | 0] >>> 0) & 0xFFFF;
-                    else
-                        this.chunks[i] = (value[(i / 2) | 0] >>> 16) & 0xFFFF;
-                }
-            }
-            // Initialize from ElfUInt
-            if (typeof value === 'object' && !Array.isArray(value)) {
-                for (var i = 0; i < this.chunks.length; i++) {
-                    this.chunks[i] = value.chunks[i];
-                }
-            }
-        }
-
-        // Methods
-        this.clone = function () {
-            return new this.constructor(this);
-        };
-
-        this.neg = function () {
-            return this.not().add(1);
-        };
-        this.not = function () {
-            var value = new this.constructor(this);
-            for (var i = 0; i < this.chunks.length; i++)
-                value.chunks[i] = ~this.chunks[i];
-            return value;
-        };
-        this.add = function (rhs) {
-            var lhs = new this.constructor(this);
-            var rhs = new this.constructor(rhs);
-            var carry = 0;
-            for (var i = 0; i < this.chunks.length; i++) {
-                var chunk_lhs = lhs.chunks[i];
-                var chunk_rhs = rhs.chunks[i];
-                lhs.chunks[i] = chunk_lhs + chunk_rhs + carry;
-                carry = ((chunk_lhs + chunk_rhs + carry) > 0xFFFF) ? 1 : 0;
-            }
-            return lhs;
-        };
-        this.sub = function (rhs) {
-            var lhs = new this.constructor(this);
-            var rhs = new this.constructor(rhs);
-            return this.add(rhs.neg());
-        };
-        this.or = function (rhs) {
-            var lhs = new this.constructor(this);
-            var rhs = new this.constructor(rhs);
-            for (var i = 0; i < this.chunks.length; i++) {
-                var chunk_lhs = lhs.chunks[i];
-                var chunk_rhs = rhs.chunks[i];
-                lhs.chunks[i] = chunk_lhs | chunk_rhs;
-            }
-            return lhs;
-        };
-        this.and = function (rhs) {
-            var lhs = new this.constructor(this);
-            var rhs = new this.constructor(rhs);
-            for (var i = 0; i < this.chunks.length; i++) {
-                var chunk_lhs = lhs.chunks[i];
-                var chunk_rhs = rhs.chunks[i];
-                lhs.chunks[i] = chunk_lhs & chunk_rhs;
-            }
-            return lhs;
-        };
-        this.xor = function (rhs) {
-            var lhs = new this.constructor(this);
-            var rhs = new this.constructor(rhs);
-            for (var i = 0; i < this.chunks.length; i++) {
-                var chunk_lhs = lhs.chunks[i];
-                var chunk_rhs = rhs.chunks[i];
-                lhs.chunks[i] = chunk_lhs ^ chunk_rhs;
-            }
-            return lhs;
-        };
-        this.shl = function (amount) {
-            var bits = amount & 15;
-            var chunks = amount >> 4;
-            var value = new this.constructor(0);
-            var carry = 0;
-            for (var i = chunks; i < this.chunks.length; i++) {
-                value.chunks[i] = ((this.chunks[i - chunks] << bits) & 0xffff) | carry;
-                carry = this.chunks[i - chunks] >> (16 - bits);
-            }
-            return value;
-        };
-        this.shr = function (amount) {
-            var bits = amount & 15;
-            var chunks = amount >> 4;
-            var value = new this.constructor(0);
-            var carry = 0;
-            for (var i = this.chunks.length - 1; i >= chunks; i--) {
-                value.chunks[i - chunks] = (this.chunks[i] >> bits) | carry;
-                carry = (this.chunks[i] << (16 - bits)) & 0xffff;
-            }
-            return value;
-        };
-
-        // Conversion
-        this.hex = function () {
-            var string = "0x";
-            for (var i = this.chunks.length - 1; i >= 0; i--) {
-                var chunkstr = this.chunks[i].toString(16);
-                chunkstr = "0".repeat(4 - chunkstr.length) + chunkstr;
-                string += chunkstr;
-            }
-            return string;
-        }
-        this.num = function () {
-            var number = 0;
-            for (var i = this.chunks.length - 1; i >= 0; i--)
-                number = (number * 0x10000) + this.chunks[i];
-            if (!Number.isSafeInteger(number)) {
-                console.warn(
-                    'Libelf.js: number ' + number +
-                    ' is beyond 53 bits integer precision, use other conversion formats for better precision'
-                );
-            }
-            return number;
-        }
-
-        // Overrides
-        this.valueOf = this.num;
-    };
-};
-
-var ElfUInt8 = ElfUInt(8);
-var ElfUInt16 = ElfUInt(16);
-var ElfUInt32 = ElfUInt(32);
-var ElfUInt64 = ElfUInt(64);
-
-const ELF_INT_NUMBER = 1;
-const ELF_INT_STRING = 2;
-const ELF_INT_OBJECT = 3;
-
-/**
  * Factory to create a Unicorn.js wrapper given a MUnicornInstance.
  */
 function createUC(MUnicornInstance) {
@@ -227,36 +32,6 @@ function createUC(MUnicornInstance) {
             this.mode = mode;
             this.handle_ptr = MUnicornInstance._malloc(4);
 
-            // ======= Memory helpers =======
-            this.__integer = function (value, width) {
-                if (typeof value === "number") value = [value];
-                switch (this.get_integer_type()) {
-                    case ELF_INT_NUMBER:
-                        return value[0];
-                    case ELF_INT_STRING:
-                        return value.map(x => x.toString(16).toUpperCase())
-                            .map(x => '0'.repeat(width / 4 - x.length) + x)
-                            .reverse().join('');
-                    case ELF_INT_OBJECT:
-                        switch (width) {
-                            case 8: return new ElfUInt8(value);
-                            case 16: return new ElfUInt16(value);
-                            case 32: return new ElfUInt32(value);
-                            case 64: return new ElfUInt64(value);
-                            default: throw 'Unexpected width';
-                        }
-                    default:
-                        throw 'Unimplemented integer type';
-                }
-            };
-
-            this.__address = function (address) {
-                let big = (typeof address === 'bigint') ? address : BigInt(address);
-                const lo = Number(big & 0xffffffffn);
-                const hi = Number((big >> 32n) & 0xffffffffn);
-                return [lo, hi];
-            };
-
             this._sizeof = function (type) {
                 switch (type) {
                     case 'i8': return 1;
@@ -269,47 +44,48 @@ function createUC(MUnicornInstance) {
                 }
             };
 
-            this.get_integer_type = function () {
-                return this.integer_type == null ? ELF_INT_NUMBER : this.integer_type;
-            };
-
-            this.set_integer_type = function (type) {
-                this.integer_type = type;
-            };
-
             // ======= Register operations =======
             this.reg_write_type = function (regid, type, value) {
                 const value_size = this._sizeof(type);
                 const value_ptr = MUnicornInstance._malloc(value_size);
-                const value_obj = new (ElfUInt(value_size * 8))(value);
-                for (let i = 0; i < value_size / 2; i++) {
-                    MUnicornInstance.setValue(value_ptr + i * 2, value_obj.chunks[i], 'i16');
-                }
+
+                MUnicornInstance.setValue(value_ptr, value, type);
+
                 const handle = MUnicornInstance.getValue(this.handle_ptr, '*');
-                const ret = MUnicornInstance.ccall('uc_reg_write', 'number', ['pointer', 'number', 'pointer'], [handle, regid, value_ptr]);
+                const ret = MUnicornInstance.ccall(
+                    'uc_reg_write', 'number',
+                    ['pointer', 'number', 'pointer'],
+                    [handle, regid, value_ptr]
+                );
+
                 MUnicornInstance._free(value_ptr);
+
                 if (ret !== uc.ERR_OK) throw `uc_reg_write failed code ${ret}: ${uc.strerror(ret)}`;
             };
 
             this.reg_read_type = function (regid, type) {
                 const value_size = this._sizeof(type);
                 const value_ptr = MUnicornInstance._malloc(value_size);
-                if (type === 'i64') {
-                    MUnicornInstance.setValue(value_ptr, 0, 'i32');
-                    MUnicornInstance.setValue(value_ptr + 4, 0, 'i32');
-                } else MUnicornInstance.setValue(value_ptr, 0, type);
+
+                MUnicornInstance.setValue(value_ptr, 0, type);
+
                 const handle = MUnicornInstance.getValue(this.handle_ptr, '*');
-                const ret = MUnicornInstance.ccall('uc_reg_read', 'number', ['pointer', 'number', 'pointer'], [handle, regid, value_ptr]);
-                let value;
-                if (type === 'i64') value = [MUnicornInstance.getValue(value_ptr, 'i32'), MUnicornInstance.getValue(value_ptr + 4, 'i32')];
-                else value = MUnicornInstance.getValue(value_ptr, type);
-                if (type.includes('i')) value = this.__integer(value, value_size * 8);
+                const ret = MUnicornInstance.ccall(
+                    'uc_reg_read', 'number',
+                    ['pointer', 'number', 'pointer'],
+                    [handle, regid, value_ptr]
+                );
+
+                const value = MUnicornInstance.getValue(value_ptr, type);
+
                 MUnicornInstance._free(value_ptr);
+
                 if (ret !== uc.ERR_OK) throw `uc_reg_read failed code ${ret}: ${uc.strerror(ret)}`;
                 return value;
             };
 
-            ['i8', 'i16', 'i32', 'i64', 'float', 'double'].forEach(t => {
+
+            ['i8', 'i16', 'i32', 'float', 'double'].forEach(t => {
                 this[`reg_write_${t}`] = (regid, value) => this.reg_write_type(regid, t, value);
                 this[`reg_read_${t}`] = (regid) => this.reg_read_type(regid, t);
             });

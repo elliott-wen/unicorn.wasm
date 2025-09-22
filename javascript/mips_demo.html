@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Unicorn WASM</title>
+    <script src="unicorn_wasm.js"></script>
+    <script src="unicorn-wrapper.js"></script>
+</head>
+
+<body>
+    <h1>Unicorn WASM Loaded!</h1>
+</body>
+<script>
+MUnicorn().then(function (MUnicornInstance) {
+    console.log("Unicorn WASM ready");
+
+    const uc = createUC(MUnicornInstance);
+
+    // Create a MIPS R6 emulator instance
+    const emu = new uc.Unicorn(uc.ARCH_MIPS, uc.UC_MODE_MIPS32 | uc.UC_MODE_BIG_ENDIAN);
+    console.log("Unicorn version:", uc.version());
+
+    // ---- Test 1: Register read/write ----
+    const testReg = uc.MIPS_REG_V0;
+    emu.reg_write_i32(testReg, 0x1234);
+    const val = emu.reg_read_i32(testReg);
+    console.log("Register V0 =", val.toString(16)); // expect 0x1234
+
+    // ---- Test 2: Memory map + write/read ----
+    const ADDRESS = 0x1000;
+    const SIZE = 0x1000;
+    emu.mem_map(ADDRESS, SIZE, uc.PROT_ALL); // RWX
+
+    const data = new Uint8Array([0x01, 0x02, 0x03, 0x04]);
+    emu.mem_write(ADDRESS, data);
+
+    const readBack = emu.mem_read(ADDRESS, 4);
+    console.log("Memory read back:", Array.from(readBack)); // expect [1,2,3,4]
+
+    // ---- Test 3 + 4: Run instructions with memory hook ----
+    // MIPS R6 instructions:
+    //   lui   t0, 0x2000 >> 16
+    //   ori   t0, t0, 0x2000 & 0xFFFF  ; t0 = 0x2000
+    //   li    t1, 0x42                 ; store value
+    //   sw    t1, 0(t0)                ; store word
+    //   lw    t2, 0(t0)                ; load word
+
+    const CODE = new Uint8Array([
+        0x3c, 0x08, 0x20, 0x00, // lui   t0, 0x2000 >>16
+        0x35, 0x08, 0x20, 0x00, // ori   t0, t0, 0x2000 &0xFFFF
+        0x20, 0x09, 0x00, 0x42, // addi  t1, zero, 0x42
+        0xad, 0x09, 0x00, 0x00, // sw    t1, 0(t0)
+        0x8d, 0x0a, 0x00, 0x00  // lw    t2, 0(t0)
+    ]);
+
+    // Map region at 0x2000 to be accessed by sw/lw
+    emu.mem_map(0x2000, 0x1000, uc.PROT_ALL);
+
+    // Write code into memory
+    emu.mem_write(ADDRESS, CODE);
+
+    // Set PC to code start
+    emu.reg_write_i32(uc.MIPS_REG_PC, ADDRESS);
+
+    // Add memory hook BEFORE emulation
+    emu.hook_add(uc.HOOK_MEM_READ | uc.HOOK_MEM_WRITE,
+        (ucInstance, type, address, size, value) => {
+            console.log(`HOOK: type=${type}, addr=0x${address.toString(16)}, size=${size}, value=${value}`);
+            return 0;
+        });
+
+    // Run instructions
+    emu.emu_start(ADDRESS, ADDRESS + CODE.length, 0, 5);
+
+    // Check register result after LW
+    const t2 = emu.reg_read_i32(uc.MIPS_REG_T2);
+    console.log("T2 after LW =", t2); // expect 0x42
+
+    console.log("All tests completed.");
+});
+</script>
+
+</html>
