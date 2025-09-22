@@ -206,7 +206,7 @@ else()
             string(FIND "${UC_COMPILER_MACRO}" "__x86_64__" UC_RET)
             if(${UC_RET} GREATER_EQUAL "0") # Because of our patch, we can now only do 32bit build in x86-64
                 set(UNICORN_TARGET_ARCH "i386")
-                set(UNICORN_CFLAGS -m32 -g)
+                set(UNICORN_CFLAGS -m32)
                 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m32")
                 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m32")
                 break()
