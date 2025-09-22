@@ -33,7 +33,7 @@
 #include "exec/helper-gen.h"
 
 #include "exec/translator.h"
-
+#include "wrapper_mips.inc.c"
 #define MIPS_DEBUG_DISAS 0
 
 /* MIPS major opcodes */

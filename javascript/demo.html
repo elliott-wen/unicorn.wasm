@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Unicorn WASM</title>
+    <script src="unicorn_wasm.js"></script>
+    <script src="libelf-integers.js"></script>
+    
+    <script src="unicorn-wrapper.js"></script>
+</head>
+<body>
+    <h1>Unicorn WASM Loaded!</h1>
+</body>
+<script>
+  // MUnicorn is the factory function
+  MUnicorn().then(function(MUnicornInstance) {
+      // WASM runtime is ready
+      console.log("Unicorn WASM ready");
+      const uc = createUC(MUnicornInstance);
+      const emu = new uc.Unicorn(uc.ARCH_X86, uc.MODE_32);
+      console.log('Unicorn version:', uc.version());
+  });
+</script>
+</html>

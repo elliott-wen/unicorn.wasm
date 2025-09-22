@@ -48,9 +48,6 @@ if(APPLE)
     endif()
 endif()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -g -gsource-map -O0")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s ALLOW_MEMORY_GROWTH=1 -g -gsource-map -O0")
-
 # Detect if unicorn is compiled as the top-level project
 set(PROJECT_IS_TOP_LEVEL OFF)
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
@@ -84,12 +81,12 @@ include(cmake/bundle_static.cmake)
 # Also we would like users to link a native cmake target, instead of a custom target for better
 # compatability.
 option(BUILD_SHARED_LIBS "Build shared instead of static library" OFF)
-option(UNICORN_LEGACY_STATIC_ARCHIVE "Enable Unicorn v1 style all-in-one objects archive for libunicorn.a" ${PROJECT_IS_TOP_LEVEL})
+option(UNICORN_LEGACY_STATIC_ARCHIVE "Enable Unicorn v1 style all-in-one objects archive for libunicorn.a" OFF)
 option(UNICORN_FUZZ "Enable fuzzing" OFF)
 option(UNICORN_LOGGING "Enable logging" OFF)
 option(UNICORN_BUILD_TESTS "Build unicorn tests" ${PROJECT_IS_TOP_LEVEL})
-option(UNICORN_INSTALL "Enable unicorn installation" ${PROJECT_IS_TOP_LEVEL})
-set(UNICORN_ARCH "x86" CACHE STRING "Enabled unicorn architectures")
+option(UNICORN_INSTALL "Enable unicorn installation" OFF)
+set(UNICORN_ARCH "mips" CACHE STRING "Enabled unicorn architectures")
 option(UNICORN_TRACER "Trace unicorn execution" OFF)
 
 foreach(ARCH_LOOP ${UNICORN_ARCH})
@@ -206,28 +203,21 @@ else()
             OUTPUT_VARIABLE UC_COMPILER_MACRO)
 
         while(TRUE)
-            set(UNICORN_TARGET_ARCH "i386")
-set(UNICORN_CFLAGS -m32)
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m32")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m32")
-break()
-            if(${UC_RET} GREATER_EQUAL "0")
+            string(FIND "${UC_COMPILER_MACRO}" "__x86_64__" UC_RET)
+            if(${UC_RET} GREATER_EQUAL "0") # Because of our patch, we can now only do 32bit build in x86-64
                 set(UNICORN_TARGET_ARCH "i386")
-                string(FIND "${UC_COMPILER_MACRO}" "__ILP32__" UC_RET)
-                if(${UC_RET} GREATER_EQUAL "0")
-                    set(UNICORN_CFLAGS -mx32)
-                    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mx32")
-                    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -mx32")
-                else()
-                    set(UNICORN_CFLAGS -m64 -mcx16)
-                    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64")
-                    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m64")
-                endif()
+                set(UNICORN_CFLAGS -m32)
+                set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m32")
+                set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m32")
                 break()
             endif()
+            # Check if compiling for i386
             string(FIND "${UC_COMPILER_MACRO}" "__i386__" UC_RET)
             if(${UC_RET} GREATER_EQUAL "0")
                 set(UNICORN_TARGET_ARCH "i386")
+                set(UNICORN_CFLAGS -m32)
+                set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m32")
+                set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -m32")
                 break()
             endif()
             string(FIND "${UC_COMPILER_MACRO}" "__arm__" UC_RET)
@@ -286,6 +276,12 @@ break()
                 set(UNICORN_TARGET_ARCH "loongarch64")
                 break()
             endif()
+            string(FIND ${UC_COMPILER_MACRO} "EMSCRIPTEN" UC_RET)
+            if (${UC_RET} GREATER_EQUAL "0")
+                set(UNICORN_TARGET_ARCH "i386")
+                set(UNICORN_CFLAGS "-O2")
+                break()
+            endif()
             message(FATAL_ERROR "Unknown host compiler: ${CMAKE_C_COMPILER}.")
         endwhile(TRUE)
     endif()
@@ -304,7 +300,7 @@ break()
         set(EXTRA_CFLAGS "${EXTRA_CFLAGS}-DUNICORN_HAS_M68K ")
     endif()
     if(UNICORN_HAS_MIPS)
-        set(EXTRA_CFLAGS "${EXTRA_CFLAGS}-DUNICORN_HAS_MIPS -DUNICORN_HAS_MIPSEL -DUNICORN_HAS_MIPS64 -DUNICORN_HAS_MIPS64EL ")
+        set(EXTRA_CFLAGS "${EXTRA_CFLAGS}-DUNICORN_HAS_MIPS ")
     endif()
     if(UNICORN_HAS_SPARC)
         set(EXTRA_CFLAGS "${EXTRA_CFLAGS}-DUNICORN_HAS_SPARC ")
@@ -355,7 +351,7 @@ break()
         set(TARGET_LIST "${TARGET_LIST}m68k-softmmu, ")
     endif()
     if(UNICORN_HAS_MIPS)
-        set(TARGET_LIST "${TARGET_LIST}mips-softmmu, mipsel-softmmu, mips64-softmmu, mips64el-softmmu, ")
+        set(TARGET_LIST "${TARGET_LIST}mips-softmmu, ")
     endif()
     if(UNICORN_HAS_SPARC)
         set(TARGET_LIST "${TARGET_LIST}sparc-softmmu, sparc64-softmmu, ")
@@ -420,18 +416,18 @@ break()
             INPUT_FILE ${CMAKE_BINARY_DIR}/mips-softmmu/config-target.mak
             OUTPUT_FILE ${CMAKE_BINARY_DIR}/mips-softmmu/config-target.h
         )
-        execute_process(COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/qemu/scripts/create_config
-            INPUT_FILE ${CMAKE_BINARY_DIR}/mipsel-softmmu/config-target.mak
-            OUTPUT_FILE ${CMAKE_BINARY_DIR}/mipsel-softmmu/config-target.h
-        )
-        execute_process(COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/qemu/scripts/create_config
-            INPUT_FILE ${CMAKE_BINARY_DIR}/mips64-softmmu/config-target.mak
-            OUTPUT_FILE ${CMAKE_BINARY_DIR}/mips64-softmmu/config-target.h
-        )
-        execute_process(COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/qemu/scripts/create_config
-            INPUT_FILE ${CMAKE_BINARY_DIR}/mips64el-softmmu/config-target.mak
-            OUTPUT_FILE ${CMAKE_BINARY_DIR}/mips64el-softmmu/config-target.h
-        )
+        # execute_process(COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/qemu/scripts/create_config
+        #     INPUT_FILE ${CMAKE_BINARY_DIR}/mipsel-softmmu/config-target.mak
+        #     OUTPUT_FILE ${CMAKE_BINARY_DIR}/mipsel-softmmu/config-target.h
+        # )
+        # execute_process(COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/qemu/scripts/create_config
+        #     INPUT_FILE ${CMAKE_BINARY_DIR}/mips64-softmmu/config-target.mak
+        #     OUTPUT_FILE ${CMAKE_BINARY_DIR}/mips64-softmmu/config-target.h
+        # )
+        # execute_process(COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/qemu/scripts/create_config
+        #     INPUT_FILE ${CMAKE_BINARY_DIR}/mips64el-softmmu/config-target.mak
+        #     OUTPUT_FILE ${CMAKE_BINARY_DIR}/mips64el-softmmu/config-target.h
+        # )
     endif()
     if(UNICORN_HAS_SPARC)
         execute_process(COMMAND sh ${CMAKE_CURRENT_SOURCE_DIR}/qemu/scripts/create_config
@@ -740,113 +736,115 @@ if(UNICORN_TRACER)
     target_compile_options(mips-softmmu PRIVATE -DUNICORN_TRACER)
 endif()
 
-add_library(mipsel-softmmu STATIC
-    ${UNICORN_ARCH_COMMON}
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -save-temps=obj")
 
-    qemu/target/mips/cp0_helper.c
-    qemu/target/mips/cp0_timer.c
-    qemu/target/mips/cpu.c
-    qemu/target/mips/dsp_helper.c
-    qemu/target/mips/fpu_helper.c
-    qemu/target/mips/helper.c
-    qemu/target/mips/lmi_helper.c
-    qemu/target/mips/msa_helper.c
-    qemu/target/mips/op_helper.c
-    qemu/target/mips/translate.c
-    qemu/target/mips/unicorn.c
-)
+# add_library(mipsel-softmmu STATIC
+#     ${UNICORN_ARCH_COMMON}
 
-if(MSVC)
-    target_compile_options(mipsel-softmmu PRIVATE
-        -DNEED_CPU_H
-        /FImipsel.h
-        /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/mipsel-softmmu
-        /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
-    )
-else()
-    target_compile_options(mipsel-softmmu PRIVATE
-        -DNEED_CPU_H
-        -include mipsel.h
-        -I${CMAKE_BINARY_DIR}/mipsel-softmmu
-        -I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
-    )
-endif()
+#     qemu/target/mips/cp0_helper.c
+#     qemu/target/mips/cp0_timer.c
+#     qemu/target/mips/cpu.c
+#     qemu/target/mips/dsp_helper.c
+#     qemu/target/mips/fpu_helper.c
+#     qemu/target/mips/helper.c
+#     qemu/target/mips/lmi_helper.c
+#     qemu/target/mips/msa_helper.c
+#     qemu/target/mips/op_helper.c
+#     qemu/target/mips/translate.c
+#     qemu/target/mips/unicorn.c
+# )
 
-if(UNICORN_TRACER)
-    target_compile_options(mipsel-softmmu PRIVATE -DUNICORN_TRACER)
-endif()
+# if(MSVC)
+#     target_compile_options(mipsel-softmmu PRIVATE
+#         -DNEED_CPU_H
+#         /FImipsel.h
+#         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/mipsel-softmmu
+#         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
+#     )
+# else()
+#     target_compile_options(mipsel-softmmu PRIVATE
+#         -DNEED_CPU_H
+#         -include mipsel.h
+#         -I${CMAKE_BINARY_DIR}/mipsel-softmmu
+#         -I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
+#     )
+# endif()
 
-add_library(mips64-softmmu STATIC
-    ${UNICORN_ARCH_COMMON}
+# if(UNICORN_TRACER)
+#     target_compile_options(mipsel-softmmu PRIVATE -DUNICORN_TRACER)
+# endif()
 
-    qemu/target/mips/cp0_helper.c
-    qemu/target/mips/cp0_timer.c
-    qemu/target/mips/cpu.c
-    qemu/target/mips/dsp_helper.c
-    qemu/target/mips/fpu_helper.c
-    qemu/target/mips/helper.c
-    qemu/target/mips/lmi_helper.c
-    qemu/target/mips/msa_helper.c
-    qemu/target/mips/op_helper.c
-    qemu/target/mips/translate.c
-    qemu/target/mips/unicorn.c
-)
+# add_library(mips64-softmmu STATIC
+#     ${UNICORN_ARCH_COMMON}
 
-if(MSVC)
-    target_compile_options(mips64-softmmu PRIVATE
-        -DNEED_CPU_H
-        /FImips64.h
-        /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/mips64-softmmu
-        /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
-    )
-else()
-    target_compile_options(mips64-softmmu PRIVATE
-        -DNEED_CPU_H
-        -include mips64.h
-        -I${CMAKE_BINARY_DIR}/mips64-softmmu
-        -I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
-    )
-endif()
+#     qemu/target/mips/cp0_helper.c
+#     qemu/target/mips/cp0_timer.c
+#     qemu/target/mips/cpu.c
+#     qemu/target/mips/dsp_helper.c
+#     qemu/target/mips/fpu_helper.c
+#     qemu/target/mips/helper.c
+#     qemu/target/mips/lmi_helper.c
+#     qemu/target/mips/msa_helper.c
+#     qemu/target/mips/op_helper.c
+#     qemu/target/mips/translate.c
+#     qemu/target/mips/unicorn.c
+# )
 
-if(UNICORN_TRACER)
-    target_compile_options(mips64-softmmu PRIVATE -DUNICORN_TRACER)
-endif()
+# if(MSVC)
+#     target_compile_options(mips64-softmmu PRIVATE
+#         -DNEED_CPU_H
+#         /FImips64.h
+#         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/mips64-softmmu
+#         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
+#     )
+# else()
+#     target_compile_options(mips64-softmmu PRIVATE
+#         -DNEED_CPU_H
+#         -include mips64.h
+#         -I${CMAKE_BINARY_DIR}/mips64-softmmu
+#         -I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
+#     )
+# endif()
 
-add_library(mips64el-softmmu STATIC
-    ${UNICORN_ARCH_COMMON}
+# if(UNICORN_TRACER)
+#     target_compile_options(mips64-softmmu PRIVATE -DUNICORN_TRACER)
+# endif()
 
-    qemu/target/mips/cp0_helper.c
-    qemu/target/mips/cp0_timer.c
-    qemu/target/mips/cpu.c
-    qemu/target/mips/dsp_helper.c
-    qemu/target/mips/fpu_helper.c
-    qemu/target/mips/helper.c
-    qemu/target/mips/lmi_helper.c
-    qemu/target/mips/msa_helper.c
-    qemu/target/mips/op_helper.c
-    qemu/target/mips/translate.c
-    qemu/target/mips/unicorn.c
-)
+# add_library(mips64el-softmmu STATIC
+#     ${UNICORN_ARCH_COMMON}
 
-if(MSVC)
-    target_compile_options(mips64el-softmmu PRIVATE
-        -DNEED_CPU_H
-        /FImips64el.h
-        /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/mips64el-softmmu
-        /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
-    )
-else()
-    target_compile_options(mips64el-softmmu PRIVATE
-        -DNEED_CPU_H
-        -include mips64el.h
-        -I${CMAKE_BINARY_DIR}/mips64el-softmmu
-        -I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
-    )
-endif()
+#     qemu/target/mips/cp0_helper.c
+#     qemu/target/mips/cp0_timer.c
+#     qemu/target/mips/cpu.c
+#     qemu/target/mips/dsp_helper.c
+#     qemu/target/mips/fpu_helper.c
+#     qemu/target/mips/helper.c
+#     qemu/target/mips/lmi_helper.c
+#     qemu/target/mips/msa_helper.c
+#     qemu/target/mips/op_helper.c
+#     qemu/target/mips/translate.c
+#     qemu/target/mips/unicorn.c
+# )
 
-if(UNICORN_TRACER)
-    target_compile_options(mips64el-softmmu PRIVATE -DUNICORN_TRACER)
-endif()
+# if(MSVC)
+#     target_compile_options(mips64el-softmmu PRIVATE
+#         -DNEED_CPU_H
+#         /FImips64el.h
+#         /I${CMAKE_CURRENT_SOURCE_DIR}/msvc/mips64el-softmmu
+#         /I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
+#     )
+# else()
+#     target_compile_options(mips64el-softmmu PRIVATE
+#         -DNEED_CPU_H
+#         -include mips64el.h
+#         -I${CMAKE_BINARY_DIR}/mips64el-softmmu
+#         -I${CMAKE_CURRENT_SOURCE_DIR}/qemu/target/mips
+#     )
+# endif()
+
+# if(UNICORN_TRACER)
+#     target_compile_options(mips64el-softmmu PRIVATE -DUNICORN_TRACER)
+# endif()
 
 endif()
 
@@ -1301,13 +1299,13 @@ if(UNICORN_HAS_M68K)
     set(UNICORN_TEST_FILE ${UNICORN_TEST_FILE} test_m68k)
 endif()
 if(UNICORN_HAS_MIPS)
-    set(UNICORN_COMPILE_OPTIONS ${UNICORN_COMPILE_OPTIONS} -DUNICORN_HAS_MIPS -DUNICORN_HAS_MIPSEL -DUNICORN_HAS_MIPS64 -DUNICORN_HAS_MIPS64EL)
-    set(UNICORN_LINK_LIBRARIES ${UNICORN_LINK_LIBRARIES} mips-softmmu mipsel-softmmu mips64-softmmu mips64el-softmmu)
+    set(UNICORN_COMPILE_OPTIONS ${UNICORN_COMPILE_OPTIONS} -DUNICORN_HAS_MIPS)
+    set(UNICORN_LINK_LIBRARIES ${UNICORN_LINK_LIBRARIES} mips-softmmu)
     set(UNICORN_SAMPLE_FILE ${UNICORN_SAMPLE_FILE} sample_mips)
     target_link_libraries(mips-softmmu PRIVATE unicorn-common)
-    target_link_libraries(mipsel-softmmu PRIVATE unicorn-common)
-    target_link_libraries(mips64-softmmu PRIVATE unicorn-common)
-    target_link_libraries(mips64el-softmmu PRIVATE unicorn-common)
+    # target_link_libraries(mipsel-softmmu PRIVATE unicorn-common)
+    # target_link_libraries(mips64-softmmu PRIVATE unicorn-common)
+    # target_link_libraries(mips64el-softmmu PRIVATE unicorn-common)
     set(UNICORN_TEST_FILE ${UNICORN_TEST_FILE} test_mips)
 endif()
 if(UNICORN_HAS_SPARC)
@@ -1371,6 +1369,21 @@ target_compile_options(unicorn PRIVATE
 if (BUILD_SHARED_LIBS)
     target_compile_options(unicorn_static PRIVATE
         ${UNICORN_COMPILE_OPTIONS}
+    )
+endif()
+
+if ("${CMAKE_C_COMPILER}" MATCHES "emcc")
+    add_executable(unicorn_wasm wasm_entrance.c)
+
+    target_link_libraries(unicorn_wasm PRIVATE unicorn unicorn-common)
+
+    target_link_options(unicorn_wasm PRIVATE
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-O2"
+        "-sEXPORTED_FUNCTIONS=['_uc_version','_uc_arch_supported','_uc_open','_uc_close','_uc_query','_uc_errno','_uc_strerror','_uc_reg_write','_uc_reg_read','_uc_reg_write_batch','_uc_reg_read_batch','_uc_mem_write','_uc_mem_read','_uc_emu_start','_uc_emu_stop','_uc_hook_add','_uc_hook_del','_uc_mem_map','_uc_mem_map_ptr','_uc_mem_unmap','_uc_mem_protect','_uc_mem_regions','_uc_context_alloc','_uc_free','_uc_context_save','_uc_context_restore', '_malloc', '_free']"
+        "-sEXPORTED_RUNTIME_METHODS=['ccall', 'getValue', 'setValue', 'addFunction', 'removeFunction', 'writeArrayToMemory']"
+        "-sEXPORT_NAME='MUnicorn'"
+        "-sMODULARIZE=1"
     )
 endif()
 
