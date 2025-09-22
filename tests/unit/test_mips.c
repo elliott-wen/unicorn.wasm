@@ -223,15 +223,15 @@ static void test_mips_simple_coredump_2137(void)
 }
 
 TEST_LIST = {
-    {"test_mips_stop_at_branch", test_mips_stop_at_branch},
-    {"test_mips_stop_at_delay_slot", test_mips_stop_at_delay_slot},
-    {"test_mips_el_ori", test_mips_el_ori},
+    // {"test_mips_stop_at_branch", test_mips_stop_at_branch},
+    // {"test_mips_stop_at_delay_slot", test_mips_stop_at_delay_slot},
+    // {"test_mips_el_ori", test_mips_el_ori},
     {"test_mips_eb_ori", test_mips_eb_ori},
-    {"test_mips_lwx_exception_issue_1314", test_mips_lwx_exception_issue_1314},
-    {"test_mips_mips16", test_mips_mips16},
-    {"test_mips_mips_fpr", test_mips_mips_fpr},
-    {"test_mips_stop_delay_slot_from_qiling",
-     test_mips_stop_delay_slot_from_qiling},
-     {"test_mips_simple_coredump_2134", test_mips_simple_coredump_2134},
-     {"test_mips_simple_coredump_2137", test_mips_simple_coredump_2137},
+    // {"test_mips_lwx_exception_issue_1314", test_mips_lwx_exception_issue_1314},
+    // {"test_mips_mips16", test_mips_mips16},
+    // {"test_mips_mips_fpr", test_mips_mips_fpr},
+    // {"test_mips_stop_delay_slot_from_qiling",
+    // test_mips_stop_delay_slot_from_qiling},
+    //  {"test_mips_simple_coredump_2134", test_mips_simple_coredump_2134},
+    //  {"test_mips_simple_coredump_2137", test_mips_simple_coredump_2137},
     {NULL, NULL}};

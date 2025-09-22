@@ -172,7 +172,7 @@ MIPSCPU *cpu_mips_init(struct uc_struct *uc)
     }
 #else
     if (uc->cpu_model == INT_MAX) {
-        uc->cpu_model = UC_CPU_MIPS32_74KF; // 74kf
+        uc->cpu_model = UC_CPU_MIPS32_MIPS32R6_GENERIC; // 74kf
     } else if (uc->cpu_model >= mips_defs_number) {
         free(cpu);
         return NULL;
