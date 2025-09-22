@@ -1,3 +1,194 @@
+/**
+ * (c) 2018 Libelf.JS
+ * Arbitrary integer emulation
+ * Based on https://github.com/pierrec/js-cuint
+ */
+
+var ElfUInt = function (width) {
+    // Configure properties based on bit-width
+    var mask = (1 << (((width - 1) % 16) + 1)) - 1;
+    var nchunks = (width + 15) / 16;
+
+    // Return class
+    return function (value) {
+        this.width = width;
+        this.chunks = new Uint16Array(nchunks);
+        this.mask = mask;
+
+        // Initialization:
+        // Several checks are omitted since JavaScript will cast any undefined/NaN's
+        // into the appropriate type while writing to the chunks array.
+        if (value == null) {
+            this.chunks.fill(0);
+        } else {
+            // Initialize from Number
+            if (typeof value === 'number') {
+                if (!Number.isSafeInteger(value)) {
+                    console.warn(
+                        'Libelf.js: number ' + value +
+                        ' is beyond 53 bits integer precision, use other initialization formats for better precision'
+                    );
+                }
+                if (value > Math.pow(2, this.width) - 1 || value < -Math.pow(2, this.width - 1)) {
+                    console.warn(
+                        'Libelf.js: number ' + value +
+                        ' overflows ' + this.width + ' bits width, use larger width to keep higher bits'
+                    );
+                }
+                for (var i = 0; i < this.chunks.length; i++) {
+                    // Apply mask on the last chunk to cast to correct width
+                    this.chunks[i] = value & (i === this.chunks.length - 1 ? this.mask : 0xFFFF);
+                    if (value < 0) {
+                        // Fix round off of bits in negative values
+                        value -= 0xFFFF;
+                    }
+                    value /= 0x10000;
+                }
+            }
+            // Initialize from String
+            if (typeof value === 'string') {
+                if (value.toLowerCase().startsWith("0x"))
+                    value = value.slice(2);
+                for (var i = 0; i < this.chunks.length; i++) {
+                    // Force NaN value to be 0
+                    this.chunks[i] = parseInt(value.slice(-4), 16) | 0;
+                    value = value.slice(0, -4);
+                }
+            }
+            // Initialize from Array (32-bit entries)
+            if (typeof value === 'object' && Array.isArray(value)) {
+                for (var i = 0; i < this.chunks.length; i++) {
+                    if (i % 2 == 0)
+                        this.chunks[i] = (value[(i / 2) | 0] >>> 0) & 0xFFFF;
+                    else
+                        this.chunks[i] = (value[(i / 2) | 0] >>> 16) & 0xFFFF;
+                }
+            }
+            // Initialize from ElfUInt
+            if (typeof value === 'object' && !Array.isArray(value)) {
+                for (var i = 0; i < this.chunks.length; i++) {
+                    this.chunks[i] = value.chunks[i];
+                }
+            }
+        }
+
+        // Methods
+        this.clone = function () {
+            return new this.constructor(this);
+        };
+
+        this.neg = function () {
+            return this.not().add(1);
+        };
+        this.not = function () {
+            var value = new this.constructor(this);
+            for (var i = 0; i < this.chunks.length; i++)
+                value.chunks[i] = ~this.chunks[i];
+            return value;
+        };
+        this.add = function (rhs) {
+            var lhs = new this.constructor(this);
+            var rhs = new this.constructor(rhs);
+            var carry = 0;
+            for (var i = 0; i < this.chunks.length; i++) {
+                var chunk_lhs = lhs.chunks[i];
+                var chunk_rhs = rhs.chunks[i];
+                lhs.chunks[i] = chunk_lhs + chunk_rhs + carry;
+                carry = ((chunk_lhs + chunk_rhs + carry) > 0xFFFF) ? 1 : 0;
+            }
+            return lhs;
+        };
+        this.sub = function (rhs) {
+            var lhs = new this.constructor(this);
+            var rhs = new this.constructor(rhs);
+            return this.add(rhs.neg());
+        };
+        this.or = function (rhs) {
+            var lhs = new this.constructor(this);
+            var rhs = new this.constructor(rhs);
+            for (var i = 0; i < this.chunks.length; i++) {
+                var chunk_lhs = lhs.chunks[i];
+                var chunk_rhs = rhs.chunks[i];
+                lhs.chunks[i] = chunk_lhs | chunk_rhs;
+            }
+            return lhs;
+        };
+        this.and = function (rhs) {
+            var lhs = new this.constructor(this);
+            var rhs = new this.constructor(rhs);
+            for (var i = 0; i < this.chunks.length; i++) {
+                var chunk_lhs = lhs.chunks[i];
+                var chunk_rhs = rhs.chunks[i];
+                lhs.chunks[i] = chunk_lhs & chunk_rhs;
+            }
+            return lhs;
+        };
+        this.xor = function (rhs) {
+            var lhs = new this.constructor(this);
+            var rhs = new this.constructor(rhs);
+            for (var i = 0; i < this.chunks.length; i++) {
+                var chunk_lhs = lhs.chunks[i];
+                var chunk_rhs = rhs.chunks[i];
+                lhs.chunks[i] = chunk_lhs ^ chunk_rhs;
+            }
+            return lhs;
+        };
+        this.shl = function (amount) {
+            var bits = amount & 15;
+            var chunks = amount >> 4;
+            var value = new this.constructor(0);
+            var carry = 0;
+            for (var i = chunks; i < this.chunks.length; i++) {
+                value.chunks[i] = ((this.chunks[i - chunks] << bits) & 0xffff) | carry;
+                carry = this.chunks[i - chunks] >> (16 - bits);
+            }
+            return value;
+        };
+        this.shr = function (amount) {
+            var bits = amount & 15;
+            var chunks = amount >> 4;
+            var value = new this.constructor(0);
+            var carry = 0;
+            for (var i = this.chunks.length - 1; i >= chunks; i--) {
+                value.chunks[i - chunks] = (this.chunks[i] >> bits) | carry;
+                carry = (this.chunks[i] << (16 - bits)) & 0xffff;
+            }
+            return value;
+        };
+
+        // Conversion
+        this.hex = function () {
+            var string = "0x";
+            for (var i = this.chunks.length - 1; i >= 0; i--) {
+                var chunkstr = this.chunks[i].toString(16);
+                chunkstr = "0".repeat(4 - chunkstr.length) + chunkstr;
+                string += chunkstr;
+            }
+            return string;
+        }
+        this.num = function () {
+            var number = 0;
+            for (var i = this.chunks.length - 1; i >= 0; i--)
+                number = (number * 0x10000) + this.chunks[i];
+            if (!Number.isSafeInteger(number)) {
+                console.warn(
+                    'Libelf.js: number ' + number +
+                    ' is beyond 53 bits integer precision, use other conversion formats for better precision'
+                );
+            }
+            return number;
+        }
+
+        // Overrides
+        this.valueOf = this.num;
+    };
+};
+
+var ElfUInt8 = ElfUInt(8);
+var ElfUInt16 = ElfUInt(16);
+var ElfUInt32 = ElfUInt(32);
+var ElfUInt64 = ElfUInt(64);
+
 const ELF_INT_NUMBER = 1;
 const ELF_INT_STRING = 2;
 const ELF_INT_OBJECT = 3;
@@ -60,11 +251,10 @@ function createUC(MUnicornInstance) {
             };
 
             this.__address = function (address) {
-                const address_obj = new ElfUInt64(address);
-                return [
-                    address_obj.chunks[0] + (address_obj.chunks[1] << 16),
-                    address_obj.chunks[2] + (address_obj.chunks[3] << 16)
-                ];
+                let big = (typeof address === 'bigint') ? address : BigInt(address);
+                const lo = Number(big & 0xffffffffn);
+                const hi = Number((big >> 32n) & 0xffffffffn);
+                return [lo, hi];
             };
 
             this._sizeof = function (type) {
@@ -126,36 +316,76 @@ function createUC(MUnicornInstance) {
 
             // ======= Memory operations =======
             this.mem_write = function (address, bytes) {
+                // Allocate buffer and copy JS array into WASM memory
                 const buffer_ptr = MUnicornInstance._malloc(bytes.length);
                 MUnicornInstance.writeArrayToMemory(bytes, buffer_ptr);
-                const [addr_lo, addr_hi] = this.__address(address);
+
+                // Get the unicorn engine handle
                 const handle = MUnicornInstance.getValue(this.handle_ptr, '*');
-                const ret = MUnicornInstance.ccall('uc_mem_write', 'number', ['pointer', 'number', 'number', 'pointer', 'number'],
-                    [handle, addr_lo, addr_hi, buffer_ptr, bytes.length]);
+
+                // Call uc_mem_write(handle, address, buffer_ptr, size)
+                const ret = MUnicornInstance.ccall(
+                    'uc_mem_write',
+                    'number',
+                    ['pointer', 'number', 'pointer', 'number'],
+                    [handle, BigInt(address), buffer_ptr, BigInt(bytes.length)]
+                );
+
+                // Free the temporary buffer
                 MUnicornInstance._free(buffer_ptr);
-                if (ret !== uc.ERR_OK) throw `uc_mem_write failed code ${ret}: ${uc.strerror(ret)}`;
+
+                if (ret !== uc.ERR_OK) {
+                    throw `uc_mem_write failed code ${ret}: ${uc.strerror(ret)}`;
+                }
             };
 
             this.mem_read = function (address, size) {
+                // Allocate buffer in WASM memory
                 const buffer_ptr = MUnicornInstance._malloc(size);
-                for (let i = 0; i < size; i++) MUnicornInstance.setValue(buffer_ptr + i, 0, 'i8');
-                const [addr_lo, addr_hi] = this.__address(address);
+
+                // Get unicorn engine handle
                 const handle = MUnicornInstance.getValue(this.handle_ptr, '*');
-                const ret = MUnicornInstance.ccall('uc_mem_read', 'number', ['pointer', 'number', 'number', 'pointer', 'number'], [handle, addr_lo, addr_hi, buffer_ptr, size]);
+
+                // Call uc_mem_read(handle, address, buffer_ptr, size)
+                const ret = MUnicornInstance.ccall(
+                    'uc_mem_read',
+                    'number',
+                    ['pointer', 'number', 'pointer', 'number'],
+                    [handle, BigInt(address), buffer_ptr, BigInt(size)]
+                );
+
+                if (ret !== uc.ERR_OK) {
+                    MUnicornInstance._free(buffer_ptr);
+                    throw `uc_mem_read failed code ${ret}: ${uc.strerror(ret)}`;
+                }
+
+                // Copy memory from WASM into a Uint8Array
                 const buffer = new Uint8Array(size);
-                for (let i = 0; i < size; i++) buffer[i] = MUnicornInstance.getValue(buffer_ptr + i, 'i8');
+                for (let i = 0; i < size; i++) {
+                    buffer[i] = MUnicornInstance.getValue(buffer_ptr + i, 'i8');
+                }
+
+                // Free the temporary buffer
                 MUnicornInstance._free(buffer_ptr);
-                if (ret !== uc.ERR_OK) throw `uc_mem_read failed code ${ret}: ${uc.strerror(ret)}`;
+
                 return buffer;
             };
-
             ['mem_map', 'mem_protect', 'mem_unmap'].forEach(fn => {
                 this[fn] = function (address, size, perms) {
-                    const [addr_lo, addr_hi] = this.__address(address);
                     const handle = MUnicornInstance.getValue(this.handle_ptr, '*');
-                    const ret = MUnicornInstance.ccall(`uc_${fn}`, 'number', ['pointer', 'number', 'number', 'number', 'number'], [handle, addr_lo, addr_hi, size, perms]);
-                    if (ret !== uc.ERR_OK) throw `uc_${fn} failed code ${ret}: ${uc.strerror(ret)}`;
-                }
+
+                    // uc_mem_map, uc_mem_protect, uc_mem_unmap all take (uc_engine*, uint64_t address, uint64_t size, uint32_t perms)
+                    const ret = MUnicornInstance.ccall(
+                        `uc_${fn}`,
+                        'number',
+                        ['pointer', 'number', 'number', 'number'],
+                        [handle, BigInt(address), BigInt(size), perms]
+                    );
+
+                    if (ret !== uc.ERR_OK) {
+                        throw `uc_${fn} failed code ${ret}: ${uc.strerror(ret)}`;
+                    }
+                };
             });
 
             this.mem_regions = function () {
@@ -171,14 +401,14 @@ function createUC(MUnicornInstance) {
                 let callback_ptr;
                 // Callback wrapping simplified
                 if (type & uc.HOOK_MEM_READ || type & uc.HOOK_MEM_WRITE || type & uc.HOOK_MEM_FETCH || type & uc.HOOK_MEM_READ_AFTER) {
-                    const callback = (_, type2, addr_lo, addr_hi, size, val_lo, val_hi, _2) => user_callback(handle, type2, addr_lo, addr_hi, size, val_lo, val_hi, user_data);
-                    callback_ptr = MUnicornInstance.addFunction(callback, 'iiiiiiiii');
+                    const callback = (_, type2, addr, size, val, _2) => user_callback(handle, type2, addr, size, val, user_data);
+                    callback_ptr = MUnicornInstance.addFunction(callback, 'iiijiji');
                 } else {
                     throw 'Unimplemented hook type';
                 }
                 const hook_ptr = MUnicornInstance._malloc(4);
-                const ret = MUnicornInstance.ccall('uc_hook_add', 'number', ['pointer', 'pointer', 'number', 'pointer', 'pointer', 'number', 'number', 'number', 'number', 'number'],
-                    [handle, hook_ptr, type, callback_ptr, 0, begin, 0, end, 0, extra]);
+                const ret = MUnicornInstance.ccall('uc_hook_add', 'number', ['pointer', 'pointer', 'number', 'pointer', 'pointer', 'number', 'number'],
+                    [handle, hook_ptr, type, callback_ptr, 0, BigInt(begin), BigInt(end)]);
                 if (ret !== uc.ERR_OK) {
                     MUnicornInstance.removeFunction(callback_ptr);
                     MUnicornInstance._free(hook_ptr);
@@ -197,13 +427,20 @@ function createUC(MUnicornInstance) {
             };
 
             // ======= Emulation =======
-            this.emu_start = function (begin, until, timeout, count) {
-                const [begin_lo, begin_hi] = this.__address(begin);
-                const [until_lo, until_hi] = this.__address(until);
+            this.emu_start = function (begin, until, timeout = 0, count = 0) {
                 const handle = MUnicornInstance.getValue(this.handle_ptr, '*');
-                const ret = MUnicornInstance.ccall('uc_emu_start', 'number', ['pointer', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
-                    [handle, begin_lo, begin_hi, until_lo, until_hi, timeout, 0, count]);
-                if (ret !== uc.ERR_OK) throw `uc_emu_start failed code ${ret}: ${uc.strerror(ret)}`;
+
+                // uc_emu_start(handle, begin, until, timeout, count)
+                const ret = MUnicornInstance.ccall(
+                    'uc_emu_start',
+                    'number',
+                    ['pointer', 'number', 'number', 'number', 'number'],
+                    [handle, BigInt(begin), BigInt(until), BigInt(timeout), count]
+                );
+
+                if (ret !== uc.ERR_OK) {
+                    throw `uc_emu_start failed code ${ret}: ${uc.strerror(ret)}`;
+                }
             };
 
             this.emu_stop = function () {

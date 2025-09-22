@@ -279,7 +279,7 @@ else()
             string(FIND ${UC_COMPILER_MACRO} "EMSCRIPTEN" UC_RET)
             if (${UC_RET} GREATER_EQUAL "0")
                 set(UNICORN_TARGET_ARCH "i386")
-                set(UNICORN_CFLAGS "-O2")
+                set(UNICORN_CFLAGS "-O3")
                 break()
             endif()
             message(FATAL_ERROR "Unknown host compiler: ${CMAKE_C_COMPILER}.")
@@ -575,10 +575,9 @@ endif()
 endif()
 
 if(UNICORN_HAS_ARM)
-set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -save-temps")
+
 add_library(arm-softmmu STATIC
     ${UNICORN_ARCH_COMMON}
-
     qemu/target/arm/cpu.c
     qemu/target/arm/crypto_helper.c
     qemu/target/arm/debug_helper.c
@@ -1379,7 +1378,8 @@ if ("${CMAKE_C_COMPILER}" MATCHES "emcc")
 
     target_link_options(unicorn_wasm PRIVATE
         "-sALLOW_MEMORY_GROWTH=1"
-        "-O2"
+        "-sALLOW_TABLE_GROWTH=1"
+        "-O3"
         "-sEXPORTED_FUNCTIONS=['_uc_version','_uc_arch_supported','_uc_open','_uc_close','_uc_query','_uc_errno','_uc_strerror','_uc_reg_write','_uc_reg_read','_uc_reg_write_batch','_uc_reg_read_batch','_uc_mem_write','_uc_mem_read','_uc_emu_start','_uc_emu_stop','_uc_hook_add','_uc_hook_del','_uc_mem_map','_uc_mem_map_ptr','_uc_mem_unmap','_uc_mem_protect','_uc_mem_regions','_uc_context_alloc','_uc_free','_uc_context_save','_uc_context_restore', '_malloc', '_free']"
         "-sEXPORTED_RUNTIME_METHODS=['ccall', 'getValue', 'setValue', 'addFunction', 'removeFunction', 'writeArrayToMemory']"
         "-sEXPORT_NAME='MUnicorn'"
@@ -1526,6 +1526,7 @@ if(UNICORN_BUILD_TESTS)
         )
         target_link_libraries(${TEST_FILE} PRIVATE
             ${SAMPLES_LIB}
+            "-sALLOW_MEMORY_GROWTH=1"
         )
         add_test(${TEST_FILE} ${TEST_FILE})
         if(ANDROID_ABI)

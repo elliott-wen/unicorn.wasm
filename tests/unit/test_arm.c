@@ -963,11 +963,12 @@ static bool test_arm_v7_lpae_hook_tlb(uc_engine *uc, uint64_t addr,
     return 1;
 }
 
-static void test_arm_v7_lpae_hook_read(uc_engine *uc, uc_mem_type type,
+static bool test_arm_v7_lpae_hook_read(uc_engine *uc, uc_mem_type type,
                                        uint64_t address, int size,
                                        uint64_t value, void *user_data)
 {
     TEST_CHECK(address == 0x100001000);
+    return 1;
 }
 
 static void test_arm_v7_lpae(void)
